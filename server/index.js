@@ -41,7 +41,7 @@ app.get('/api/captcha', async (req, res) => {
         });
 
         // Wait for the captcha text to appear
-        await page.waitForSelector('#captcha-code', { timeout: 10000 });
+        await page.waitForSelector('#captcha-code', { timeout: 30000 });
 
         // Extract captcha text instead of screenshot
         const captchaText = await page.$eval('#captcha-code', el => el.textContent.trim());
@@ -52,6 +52,31 @@ app.get('/api/captcha', async (req, res) => {
     } catch (error) {
         console.error('Error fetching captcha:', error);
         res.status(500).json({ error: 'Failed to fetch captcha' });
+    }
+});
+
+
+app.get('/api/case-types', async (req, res) => {
+    try {
+        const browser = await playwright.chromium.launch({ headless: true });
+        const page = await browser.newPage();
+        await page.goto('https://delhihighcourt.nic.in/app/get-case-type-status', {
+            waitUntil: 'domcontentloaded'
+        });
+
+        // Scrape all case types
+        const caseTypes = await page.$$eval('#case_type option', options =>
+            options
+                .map(o => o.textContent.trim())
+                .filter(text => text && text !== 'Select')
+        );
+
+        await browser.close();
+
+        res.json({ caseTypes });
+    } catch (error) {
+        console.error('Error fetching case types:', error);
+        res.status(500).json({ error: 'Failed to fetch case types' });
     }
 });
 
@@ -69,46 +94,57 @@ app.post('/api/fetch-case-data', async (req, res) => {
     try {
         browser = await playwright.chromium.launch({ headless: true });
         const page = await browser.newPage();
-        await page.goto('https://delhihighcourt.nic.in/case-status', { waitUntil: 'domcontentloaded' });
 
-        // Fill out the form
-        await page.selectOption('#ddlCaseType', caseType);
-        await page.fill('#txtCaseNumber', caseNumber);
-        await page.fill('#txtCaseYear', filingYear);
-        await page.fill('#txtCaptcha', captcha);
+        // Open the page
+        await page.goto('https://delhihighcourt.nic.in/app/get-case-type-status', { waitUntil: 'domcontentloaded' });
 
-        await page.click('#btnSearch');
-        await page.waitForSelector('#caseDetails', { timeout: 15000 });
+        // Fill form
+        await page.selectOption('#case_type', caseType);
+        await page.fill('#case_number', caseNumber);
+        await page.selectOption('#case_year', filingYear);
+        await page.fill('#captchaInput', captcha);
 
-        const rawResponse = await page.content();
+        // Click search
+        await Promise.all([
+            page.click('#search'),
+            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null)
+        ]);
 
-        // Extract details using actual selectors
+        // Check if captcha error appears
+        const errorText = await page.evaluate(() => {
+            const errorEl = document.querySelector('.error, #error_message');
+            return errorEl ? errorEl.textContent.trim() : null;
+        });
+
+        if (errorText && errorText.toLowerCase().includes('captcha')) {
+            throw new Error('Invalid captcha or captcha expired');
+        }
+
+        // Wait for case details or table
+        await page.waitForSelector('#caseTable, #caseDetails, .dataTables_wrapper', { timeout: 15000 });
+
         const caseDetails = await page.evaluate(() => {
+            const table = document.querySelector('#caseTable');
+            if (table) {
+                return Array.from(table.querySelectorAll('tbody tr')).map(row =>
+                    Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim())
+                );
+            }
             return {
                 petitioner: document.querySelector('#lblPetitioner')?.textContent.trim() || '',
                 respondent: document.querySelector('#lblRespondent')?.textContent.trim() || '',
                 filingDate: document.querySelector('#lblFilingDate')?.textContent.trim() || '',
-                nextHearingDate: document.querySelector('#lblNextHearingDate')?.textContent.trim() || '',
-                orders: Array.from(document.querySelectorAll('#ordersList a')).map(a => ({
-                    text: a.textContent.trim(),
-                    url: a.href
-                }))
+                nextHearingDate: document.querySelector('#lblNextHearingDate')?.textContent.trim() || ''
             };
         });
 
-        // Save to database
-        db.run(
-            'INSERT INTO queries (caseType, caseNumber, filingYear, rawResponse) VALUES (?, ?, ?, ?)',
-            [caseType, caseNumber, filingYear, rawResponse]
-        );
-
-        res.json({ message: 'Success', data: caseDetails });
+        res.json({ success: true, caseDetails });
     } catch (err) {
-        console.error('Scraping error:', err);
-        res.status(500).json({ error: 'Failed to fetch case data', details: err.message });
+        res.status(500).json({ error: err.message });
     } finally {
         if (browser) await browser.close();
     }
 });
+
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

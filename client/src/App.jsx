@@ -1,40 +1,29 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios'; // ✅ Import axios
 import { getCaptcha, fetchCaseDetails } from './api';
-import CaseForm from './components/CaseForm';
-import CaseDetails from './components/CaseDetails';
 
 function App() {
   const [captcha, setCaptcha] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [caseType, setCaseType] = useState('FAO');
+  const [selectedCaseType, setSelectedCaseType] = useState(''); // ✅ Added state
+  const [caseTypes, setCaseTypes] = useState([]);              // ✅ Added state
   const [caseNumber, setCaseNumber] = useState('');
   const [filingYear, setFilingYear] = useState('');
   const [caseData, setCaseData] = useState(null);
   const [error, setError] = useState('');
 
-  // Fetch captcha on component mount
   useEffect(() => {
-    fetchCaptcha();
+    // Fetch case types
+    axios.get('http://localhost:3001/api/case-types')
+      .then(res => setCaseTypes(res.data.caseTypes))
+      .catch(err => console.error('Error fetching case types:', err));
+
+    // Fetch captcha
+    axios.get('http://localhost:3001/api/captcha')
+      .then(res => setCaptcha(res.data.captcha))
+      .catch(err => console.error('Error fetching captcha:', err));
   }, []);
-
-  const fetchCaptcha = async () => {
-    try {
-      setLoading(true);
-      const captchaText = await getCaptcha();
-      setCaptcha(captchaText);
-    } catch (error) {
-      console.error('Error fetching captcha:', error);
-      setCaptcha('Error loading captcha');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefreshCaptcha = () => {
-    fetchCaptcha();
-    setCaptchaInput('');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,8 +31,8 @@ function App() {
       setError('');
       setCaseData(null);
       setLoading(true);
-      const data = await fetchCaseDetails(caseType, caseNumber, filingYear, captchaInput);
-      setCaseData(data.data);
+      const response = await fetchCaseDetails(selectedCaseType, caseNumber, filingYear, captchaInput);
+      setCaseData(response.data);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch case details. Please check your inputs.');
@@ -59,33 +48,37 @@ function App() {
       <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg w-96 space-y-4">
         <div>
           <label className="block mb-1">Case Type:</label>
-          <select 
+          <select
             className="w-full p-2 rounded bg-gray-700 border border-gray-600"
-            value={caseType}
-            onChange={(e) => setCaseType(e.target.value)}
+            value={selectedCaseType}
+            onChange={e => setSelectedCaseType(e.target.value)}
           >
-            <option value="FAO">FAO</option>
-            <option value="CS(OS)">CS(OS)</option>
+            <option value="">Select</option>
+            {caseTypes.map((type, idx) => (
+              <option key={idx} value={type}>
+                {type}
+              </option>
+            ))}
           </select>
         </div>
 
         <div>
           <label className="block mb-1">Case Number:</label>
-          <input 
+          <input
             type="text"
-            className="w-full p-2 rounded bg-gray-700 border border-gray-600"
             value={caseNumber}
-            onChange={(e) => setCaseNumber(e.target.value)}
+            onChange={e => setCaseNumber(e.target.value)}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600"
           />
         </div>
 
         <div>
           <label className="block mb-1">Filing Year:</label>
-          <input 
+          <input
             type="text"
-            className="w-full p-2 rounded bg-gray-700 border border-gray-600"
             value={filingYear}
-            onChange={(e) => setFilingYear(e.target.value)}
+            onChange={e => setFilingYear(e.target.value)}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600"
           />
         </div>
 
@@ -93,33 +86,43 @@ function App() {
           <label className="block mb-1">Captcha:</label>
           <div className="flex items-center space-x-2">
             <span className="bg-gray-100 p-2 rounded text-black font-mono text-lg min-w-[80px] text-center">
-              {loading ? 'Loading...' : captcha}
+              {captcha || 'Loading...'}
             </span>
-            <button 
-              type="button" 
-              className="bg-blue-600 px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
-              onClick={handleRefreshCaptcha}
-              disabled={loading}
+            <button
+              type="button"
+              className="bg-blue-600 px-2 py-1 rounded hover:bg-blue-700"
+              onClick={() =>
+                axios.get('http://localhost:3001/api/captcha').then(res => setCaptcha(res.data.captcha))
+              }
             >
               ↻
             </button>
           </div>
-          <input 
+          <input
             type="text"
-            placeholder="Enter captcha" 
+            placeholder="Enter captcha"
             className="mt-2 w-full p-2 rounded bg-gray-700 border border-gray-600"
             value={captchaInput}
-            onChange={(e) => setCaptchaInput(e.target.value)}
+            onChange={e => setCaptchaInput(e.target.value)}
           />
         </div>
 
-        <button type="submit" className="w-full bg-green-600 py-2 rounded hover:bg-green-700 disabled:opacity-50" disabled={loading}>
+        <button type="submit" className="w-full bg-green-600 py-2 rounded hover:bg-green-700">
           {loading ? 'Fetching...' : 'Fetch Case Details'}
         </button>
       </form>
 
-      {error && <p className="mt-4 text-red-500">{error}</p>}
-      {caseData && <CaseDetails data={caseData} />}
+      {error && <p className="text-red-500 mt-4">{error}</p>}
+
+      {caseData && (
+        <div className="bg-gray-800 mt-6 p-4 rounded-lg w-96">
+          <h2 className="text-xl font-bold mb-2">Case Details</h2>
+          <p><strong>Petitioner:</strong> {caseData.petitioner}</p>
+          <p><strong>Respondent:</strong> {caseData.respondent}</p>
+          <p><strong>Filing Date:</strong> {caseData.filingDate}</p>
+          <p><strong>Next Hearing Date:</strong> {caseData.nextHearingDate}</p>
+        </div>
+      )}
     </div>
   );
 }
