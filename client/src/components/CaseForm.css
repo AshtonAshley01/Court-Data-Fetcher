@@ -1,0 +1,181 @@
+/* General Body Styles for Centering */
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f0f2f5; /* Light grey background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Ensure it takes full viewport height */
+    padding: 20px; /* Some padding around the form */
+    box-sizing: border-box; /* Include padding in element's total width and height */
+  }
+  
+  /* Case Form Container */
+  .case-form-container {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .form-title {
+    text-align: center;
+    color: #333333;
+    margin-bottom: 25px;
+    font-size: 1.8em;
+    font-weight: 700;
+  }
+  
+  /* Form Groups */
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555555;
+    font-weight: 600;
+    font-size: 0.95em;
+  }
+  
+  /* Form Inputs (text, number, select) */
+  .form-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cccccc;
+    border-radius: 8px;
+    font-size: 1em;
+    color: #333333;
+    box-sizing: border-box; /* Crucial for consistent sizing */
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  }
+  
+  /* Captcha Specific Styles */
+  .captcha-group {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Spacing between captcha and button */
+    margin-bottom: 10px; /* Space between captcha row and input below */
+  }
+  
+  .captcha-image {
+    border: 1px solid #dddddd;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+    padding: 5px 10px;
+    display: block; /* Ensures image does not have extra space below it */
+    height: 40px; /* Fixed height for consistency */
+    min-width: 120px; /* Ensure a minimum width */
+    object-fit: contain; /* Ensures image fits within bounds */
+  }
+  
+  .captcha-placeholder {
+    background-color: #e0e0e0;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 10px 15px;
+    min-width: 120px;
+    text-align: center;
+    color: #777777;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px; /* Match image height */
+  }
+  
+  .refresh-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px; /* Ensures button is not too small */
+    height: 40px; /* Match captcha height */
+  }
+  
+  .refresh-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.02);
+  }
+  
+  .refresh-button:active {
+    transform: scale(0.98);
+  }
+  
+  /* Submit Button */
+  .submit-button {
+    width: 100%;
+    padding: 14px;
+    background-color: #28a745; /* Green */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px; /* Space for potential loading spinner */
+  }
+  
+  .submit-button:hover:not(:disabled) {
+    background-color: #218838;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+  }
+  
+  .submit-button:disabled {
+    background-color: #90ee90; /* Lighter green when disabled */
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  /* Error Message */
+  .error-message {
+    color: #dc3545; /* Red */
+    background-color: #f8d7da; /* Light red background */
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.9em;
+  }
+  
+  /* Basic Loading Spinner (Optional - you can add a more complex one if needed) */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .loading-spinner {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid #ffffff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+  }

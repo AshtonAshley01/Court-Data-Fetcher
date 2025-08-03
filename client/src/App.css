@@ -1,5 +1,13 @@
 @import 'tailwindcss';
+@import  'tailwind/base';
+@import 'tailwind/components';
+@import 'tailwind/utilities';
 
+/* @theme {
+  --color-background-100: #764abc;
+  --color-lilac-100: #eabad2;
+  --color-light-100: #eae3f5;
+} */
 
 
 
