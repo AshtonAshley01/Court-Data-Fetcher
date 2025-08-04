@@ -37,7 +37,8 @@ app.get('/api/captcha', async (req, res) => {
         const page = await browser.newPage();
 
         await page.goto('https://delhihighcourt.nic.in/app/get-case-type-status', {
-            waitUntil: 'domcontentloaded'
+            waitUntil: 'domcontentloaded',
+            timeout: 60000
         });
 
         // Wait for the captcha text to appear
@@ -61,7 +62,8 @@ app.get('/api/case-types', async (req, res) => {
         const browser = await playwright.chromium.launch({ headless: true });
         const page = await browser.newPage();
         await page.goto('https://delhihighcourt.nic.in/app/get-case-type-status', {
-            waitUntil: 'domcontentloaded'
+            waitUntil: 'domcontentloaded',
+            timeout: 60000
         });
 
         // Scrape all case types
@@ -92,53 +94,113 @@ app.post('/api/fetch-case-data', async (req, res) => {
 
     let browser;
     try {
-        browser = await playwright.chromium.launch({ headless: true });
+        browser = await playwright.chromium.launch({ 
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled'
+            ] 
+        });
         const page = await browser.newPage();
 
         // Open the page
         await page.goto('https://delhihighcourt.nic.in/app/get-case-type-status', { waitUntil: 'domcontentloaded' });
 
-        // Fill form
+        console.log('Filling form...');
+
         await page.selectOption('#case_type', caseType);
         await page.fill('#case_number', caseNumber);
         await page.selectOption('#case_year', filingYear);
         await page.fill('#captchaInput', captcha);
 
-        // Click search
+        // console.log('Clicking search button...');
+        // await Promise.all([
+        //     page.click('#search'),
+        //     setTimeout(() => {
+        //         console.log("This message appears after 10 seconds.");
+        //     }, 10000),
+        //     page.waitForSelector('#caseTable', { timeout: 30000, waitUntil: 'domcontentloaded' })
+        // ]);
+
+        // // Wait until the table finishes loading (DataTables AJAX)
+        // await page.waitForFunction(() => {
+        //     const emptyCell = document.querySelector('#caseTable');
+        //     return !emptyCell; // Wait until "No data" is NOT present
+        // }, { timeout: 15000 }).catch(() => console.log('No case data found.'));
+
+        // console.log('Extracting case details...');
+        // const caseDetails = await page.evaluate(() => {
+        //     const rows = Array.from(document.querySelectorAll('#caseTable'));
+        //     return rows.map(row => row.outerHTML);
+        //     return rows.map(row => {
+        //         const cells = row.querySelectorAll('td');
+        //         return {
+        //             serialNo: cells[0]?.innerText.trim() || '',
+        //             diaryOrCaseNo: cells[1]?.innerText.trim() || '',
+        //             petitionerVsRespondent: cells[2]?.innerText.trim() || '',
+        //             listingDateOrCourtNo: cells[3]?.innerText.trim() || ''
+        //         };
+        //     });
+        // });
+
+        console.log('Clicking search button...');
         await Promise.all([
             page.click('#search'),
-            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null)
+            page.waitForNavigation({ waitUntil: 'networkidle' }) // Wait for page to fully reload
         ]);
 
-        // Check if captcha error appears
-        const errorText = await page.evaluate(() => {
-            const errorEl = document.querySelector('.error, #error_message');
-            return errorEl ? errorEl.textContent.trim() : null;
-        });
 
-        if (errorText && errorText.toLowerCase().includes('captcha')) {
-            throw new Error('Invalid captcha or captcha expired');
+        // Poll the table 10 times every 5 seconds
+        for (let i = 0; i < 10; i++) {
+            console.log(`Attempt ${i + 1}: Waiting for table refresh...`);
+
+            const hasData = await page.evaluate(() => {
+                const rows = document.querySelectorAll('#caseTable tbody tr');
+                if (!rows.length) return false;
+
+                // If only one row exists and has dt-empty, no data yet
+                if (rows.length === 1 && rows[0].querySelector('td.dt-empty')) {
+                    return false;
+                }
+
+                return true; // Data rows available
+            });
+
+            if (hasData) {
+                console.log('Data found in table.');
+                break;
+            }
+
+            console.log('No data yet, waiting 5 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        // Wait for case details or table
-        await page.waitForSelector('#caseTable, #caseDetails, .dataTables_wrapper', { timeout: 15000 });
-
+        // Extract table data
+        console.log('Extracting case details...');
         const caseDetails = await page.evaluate(() => {
-            const table = document.querySelector('#caseTable');
-            if (table) {
-                return Array.from(table.querySelectorAll('tbody tr')).map(row =>
-                    Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim())
-                );
+            const rows = Array.from(document.querySelectorAll('#caseTable tbody tr'));
+
+            if (rows.length === 1 && rows[0].querySelector('td.dt-empty')) {
+                return []; // No case data
             }
-            return {
-                petitioner: document.querySelector('#lblPetitioner')?.textContent.trim() || '',
-                respondent: document.querySelector('#lblRespondent')?.textContent.trim() || '',
-                filingDate: document.querySelector('#lblFilingDate')?.textContent.trim() || '',
-                nextHearingDate: document.querySelector('#lblNextHearingDate')?.textContent.trim() || ''
-            };
+
+            return rows.map(row => {
+                const cells = row.querySelectorAll('td');
+                return {
+                    serialNo: cells[0]?.innerText.trim() || '',
+                    diaryOrCaseNo: cells[1]?.innerText.trim() || '',
+                    petitionerVsRespondent: cells[2]?.innerText.trim() || '',
+                    listingDateOrCourtNo: cells[3]?.innerText.trim() || ''
+                };
+            });
         });
 
-        res.json({ success: true, caseDetails });
+
+        console.log(caseDetails);
+
+res.json({ success: true, caseDetails });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     } finally {
