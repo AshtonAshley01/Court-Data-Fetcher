@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getCaptcha, fetchCaseDetails } from './api';
+import OrdersPage from './components/orders'
 
 function App() {
   const [captcha, setCaptcha] = useState('');
@@ -151,46 +152,60 @@ function App() {
           </div>
         )} */}
 
+
+
         {caseData?.caseDetails ? (
           caseData.caseDetails.length > 0 ? (
-            <div className="mt-6 bg-blue-50 p-5 rounded-lg border border-blue-200 shadow-inner">
-              <h2 className="text-lg font-bold text-blue-800 mb-3 text-center">Case Details</h2>
-              <table className="w-full border border-gray-300 text-sm text-left">
-                <thead className="bg-blue-100">
-                  <tr>
-                    <th className="p-2 border">S.No</th>
-                    <th className="p-2 border">Diary/Case No.</th>
-                    <th className="p-2 border">Petitioner vs Respondent</th>
-                    <th className="p-2 border">Listing Date/Court No.</th>
-                    <th className="p-2 border">Orders</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {caseData.caseDetails.map((caseItem, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="p-2 border">{caseItem.serialNo}</td>
-                      <td className="p-2 border">{caseItem.diaryOrCaseNo}</td>
-                      <td className="p-2 border">{caseItem.petitionerVsRespondent}</td>
-                      <td className="p-2 border">{caseItem.listingDateOrCourtNo}</td>
-                      <td className="p-2 border">
-                        {caseItem.ordersLink ? (
-                          <a 
-                            href={caseItem.ordersLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+            <div className="mt-6 bg-white p-5 rounded-2xl shadow-md border border-gray-200 w-full overflow-x-auto">
+              <h2 className="text-xl font-bold text-blue-800 mb-4 text-center">
+                Case Details
+              </h2>
+
+              {/* Responsive Table Wrapper */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 text-sm text-left rounded-lg">
+                  <thead className="bg-blue-100">
+                    <tr>
+                      <th className="p-3 border text-center">S.No</th>
+                      <th className="p-3 border">Diary/Case No.</th>
+                      <th className="p-3 border">Petitioner vs Respondent</th>
+                      <th className="p-3 border">Listing Date/Court No.</th>
+                      <th className="p-3 border text-center">Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {caseData.caseDetails.map((caseItem, idx) => (
+                      <tr 
+                        key={idx} 
+                        className="hover:bg-gray-50 transition duration-150 ease-in-out"
+                      >
+                        <td className="p-3 border text-center font-medium">{caseItem.serialNo}</td>
+                        <td className="p-3 border whitespace-pre-wrap">{caseItem.diaryOrCaseNo}</td>
+                        <td className="p-3 border whitespace-pre-wrap">{caseItem.petitionerVsRespondent}</td>
+                        <td className="p-3 border whitespace-pre-wrap">{caseItem.listingDateOrCourtNo}</td>
+                        {/* <td className="p-3 border text-center"> */}
+                        <td className="p-2 border">
+                        {caseItem.ordersLink && typeof caseItem.ordersLink === 'string' ? (
+                          <a
+                            href={`/orders?link=${encodeURIComponent(caseItem.ordersLink)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-blue-600 underline"
                           >
                             View Orders
                           </a>
                         ) : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
-            <p className="mt-4 text-center text-gray-600">No case data found.</p>
+            <p className="mt-4 text-center text-gray-600 text-base font-medium">
+              No case data found.
+            </p>
           )
         ) : null}
 

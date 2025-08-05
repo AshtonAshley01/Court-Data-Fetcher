@@ -403,21 +403,76 @@ app.post('/api/fetch-case-data', async (req, res) => {
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        // Store the query in database
+        // // Store the query in database
+        // const rawResponse = JSON.stringify(caseDetails);
+        // db.run(
+        //     'INSERT INTO queries (caseType, caseNumber, filingYear, rawResponse) VALUES (?, ?, ?, ?)',
+        //     [caseType, caseNumber, filingYear, rawResponse],
+        //     function(err) {
+        //         if (err) {
+        //             console.error('Database error:', err.message);
+        //         } else {
+        //             console.log('Query saved to database with ID:', this.lastID);
+        //         }
+        //     }
+        // );
+
+        console.log('Case details extracted:', caseDetails);
+
+        // Fetch additional order details for each case
+        for (const caseItem of caseDetails) {
+            if (caseItem.ordersLink) {
+                const ordersPage = await browser.newPage();
+                await ordersPage.goto(caseItem.ordersLink, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        
+                await ordersPage.waitForSelector('table', { timeout: 30000 });
+        
+                // Extract filing date & next hearing date
+                const caseMeta = await ordersPage.evaluate(() => ({
+                    filingDate: document.querySelector('#lblFilingDate')?.innerText.trim() || '',
+                    nextHearingDate: document.querySelector('#lblNextHearingDate')?.innerText.trim() || ''
+                }));
+        
+                const ordersData = await ordersPage.evaluate(() => {
+                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                    return rows.map(row => {
+                        const cells = row.querySelectorAll('td');
+                        return {
+                            serialNo: cells[0]?.innerText.trim() || '',
+                            caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
+                            dateOfOrder: cells[2]?.innerText.trim() || '',
+                            corrigendum: cells[3]?.innerText.trim() || '',
+                            hindiOrder: cells[4]?.innerText.trim() || '',
+                            pdfLink: cells[1]?.querySelector('a')?.href || ''
+                        };
+                    });
+                });
+        
+                caseItem.filingDate = caseMeta.filingDate;
+                caseItem.nextHearingDate = caseMeta.nextHearingDate;
+                caseItem.ordersData = ordersData;
+        
+                // delete caseItem.ordersLink; // remove raw link from response
+
+                // Keep the ordersLink for frontend use
+                caseItem.ordersLink = caseItem.ordersLink || '';
+        
+                await ordersPage.close();
+            }
+        }
+        
+
+        // Save the query in the database
         const rawResponse = JSON.stringify(caseDetails);
         db.run(
             'INSERT INTO queries (caseType, caseNumber, filingYear, rawResponse) VALUES (?, ?, ?, ?)',
             [caseType, caseNumber, filingYear, rawResponse],
-            function(err) {
-                if (err) {
-                    console.error('Database error:', err.message);
-                } else {
-                    console.log('Query saved to database with ID:', this.lastID);
-                }
+            function (err) {
+                if (err) console.error('Database error:', err.message);
+                else console.log('Query saved to database with ID:', this.lastID);
             }
         );
 
-        console.log('Case details extracted:', caseDetails);
 
         res.json({ 
             success: true, 
@@ -438,6 +493,53 @@ app.post('/api/fetch-case-data', async (req, res) => {
         }
     }
 });
+
+
+app.get('/api/case-orders', async (req, res) => {
+    const { link } = req.query; // Pass the ordersLink as query
+
+    if (!link) {
+        return res.status(400).json({ error: 'Missing orders link' });
+    }
+
+    let browser;
+    try {
+        browser = await playwright.chromium.launch({ headless: true });
+        const page = await browser.newPage();
+
+        await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        // Extract metadata
+        const caseMeta = await page.evaluate(() => ({
+            filingDate: document.querySelector('#lblFilingDate')?.innerText.trim() || '',
+            nextHearingDate: document.querySelector('#lblNextHearingDate')?.innerText.trim() || ''
+        }));
+
+        // Extract orders data
+        const ordersData = await page.evaluate(() => {
+            const rows = Array.from(document.querySelectorAll('table tbody tr'));
+            return rows.map(row => {
+                const cells = row.querySelectorAll('td');
+                return {
+                    serialNo: cells[0]?.innerText.trim() || '',
+                    caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
+                    dateOfOrder: cells[2]?.innerText.trim() || '',
+                    corrigendum: cells[3]?.innerText.trim() || '',
+                    hindiOrder: cells[4]?.innerText.trim() || '',
+                    pdfLink: cells[1]?.querySelector('a')?.href || ''
+                };
+            });
+        });
+
+        res.json({ success: true, ...caseMeta, ordersData });
+    } catch (err) {
+        console.error('Error fetching case orders:', err);
+        res.status(500).json({ error: 'Failed to fetch case orders', details: err.message });
+    } finally {
+        if (browser) await browser.close();
+    }
+});
+
 
 // Optional: Get query history
 app.get('/api/query-history', (req, res) => {
