@@ -381,9 +381,15 @@ app.post('/api/fetch-case-data', async (req, res) => {
 
                     return rows.map(row => {
                         const cells = row.querySelectorAll('td');
+                
+                        // Extract orders link from the 2nd cell (diary/case no column)
+                        const ordersLinkElement = cells[1]?.querySelector('a[href*="case-type-status-details"]');
+                        const ordersLink = ordersLinkElement ? ordersLinkElement.href : '';
+                
                         return {
                             serialNo: cells[0]?.innerText.trim() || '',
                             diaryOrCaseNo: cells[1]?.innerText.trim() || '',
+                            ordersLink,
                             petitionerVsRespondent: cells[2]?.innerText.trim() || '',
                             listingDateOrCourtNo: cells[3]?.innerText.trim() || ''
                         };

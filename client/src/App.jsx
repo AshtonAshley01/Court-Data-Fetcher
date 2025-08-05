@@ -30,7 +30,9 @@ function App() {
       setCaseData(null);
       setLoading(true);
       const response = await fetchCaseDetails(selectedCaseType, caseNumber, filingYear, captchaInput);
-      setCaseData(response.data);
+      // setCaseData(response.data);
+      setCaseData(response);
+      console.log("Fetched case data:", response.data);
     } catch (err) {
       console.error(err);
       setError('❌ Failed to fetch case details. Please verify inputs and retry.');
@@ -137,7 +139,7 @@ function App() {
         {error && <p className="mt-4 text-center text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">{error}</p>}
 
         {/* Case Details */}
-        {caseData && (
+        {/* {caseData && (
           <div className="mt-6 bg-blue-50 p-5 rounded-lg border border-blue-200 shadow-inner">
             <h2 className="text-lg font-bold text-blue-800 mb-3 text-center">Case Details</h2>
             <div className="space-y-1 text-gray-700 text-sm">
@@ -147,7 +149,52 @@ function App() {
               <p><strong>Next Hearing Date:</strong> {caseData.nextHearingDate || 'N/A'}</p>
             </div>
           </div>
-        )}
+        )} */}
+
+        {caseData?.caseDetails ? (
+          caseData.caseDetails.length > 0 ? (
+            <div className="mt-6 bg-blue-50 p-5 rounded-lg border border-blue-200 shadow-inner">
+              <h2 className="text-lg font-bold text-blue-800 mb-3 text-center">Case Details</h2>
+              <table className="w-full border border-gray-300 text-sm text-left">
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="p-2 border">S.No</th>
+                    <th className="p-2 border">Diary/Case No.</th>
+                    <th className="p-2 border">Petitioner vs Respondent</th>
+                    <th className="p-2 border">Listing Date/Court No.</th>
+                    <th className="p-2 border">Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {caseData.caseDetails.map((caseItem, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="p-2 border">{caseItem.serialNo}</td>
+                      <td className="p-2 border">{caseItem.diaryOrCaseNo}</td>
+                      <td className="p-2 border">{caseItem.petitionerVsRespondent}</td>
+                      <td className="p-2 border">{caseItem.listingDateOrCourtNo}</td>
+                      <td className="p-2 border">
+                        {caseItem.ordersLink ? (
+                          <a 
+                            href={caseItem.ordersLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 underline"
+                          >
+                            View Orders
+                          </a>
+                        ) : 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-4 text-center text-gray-600">No case data found.</p>
+          )
+        ) : null}
+
+
       </div>
     </div>
   );
