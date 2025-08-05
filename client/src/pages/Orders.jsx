@@ -20,10 +20,10 @@ function OrdersPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4 text-center">Case Orders</h1>
-      <div className="bg-gray-100 p-4 rounded mb-4">
+      {/* <div className="bg-gray-100 p-4 rounded mb-4">
         <p><strong>Filing Date:</strong> {data.filingDate || 'N/A'}</p>
         <p><strong>Next Hearing Date:</strong> {data.nextHearingDate || 'N/A'}</p>
-      </div>
+      </div> */}
 
       <table className="w-full border border-gray-300">
         <thead className="bg-gray-200">

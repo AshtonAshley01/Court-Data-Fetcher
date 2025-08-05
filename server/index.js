@@ -381,6 +381,7 @@ app.post('/api/fetch-case-data', async (req, res) => {
 
                     return rows.map(row => {
                         const cells = row.querySelectorAll('td');
+                        console.log(cells);
                 
                         // Extract orders link from the 2nd cell (diary/case no column)
                         const ordersLinkElement = cells[1]?.querySelector('a[href*="case-type-status-details"]');
@@ -437,6 +438,7 @@ app.post('/api/fetch-case-data', async (req, res) => {
                     const rows = Array.from(document.querySelectorAll('table tbody tr'));
                     return rows.map(row => {
                         const cells = row.querySelectorAll('td');
+                        console.log(cells);
                         return {
                             serialNo: cells[0]?.innerText.trim() || '',
                             caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
@@ -495,6 +497,52 @@ app.post('/api/fetch-case-data', async (req, res) => {
 });
 
 
+// app.get('/api/case-orders', async (req, res) => {
+//     const { link } = req.query; // Pass the ordersLink as query
+
+//     if (!link) {
+//         return res.status(400).json({ error: 'Missing orders link' });
+//     }
+
+//     let browser;
+//     try {
+//         browser = await playwright.chromium.launch({ headless: true });
+//         const page = await browser.newPage();
+
+//         await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+//         // Extract metadata
+//         const caseMeta = await page.evaluate(() => ({
+//             filingDate: document.querySelector('#lblFilingDate')?.innerText.trim() || '',
+//             nextHearingDate: document.querySelector('#lblNextHearingDate')?.innerText.trim() || ''
+//         }));
+
+//         // Extract orders data
+//         const ordersData = await page.evaluate(() => {
+//             const rows = Array.from(document.querySelectorAll('table tbody tr'));
+//             return rows.map(row => {
+//                 const cells = row.querySelectorAll('td');
+//                 return {
+//                     serialNo: cells[0]?.innerText.trim() || '',
+//                     caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
+//                     dateOfOrder: cells[2]?.innerText.trim() || '',
+//                     corrigendum: cells[3]?.innerText.trim() || '',
+//                     hindiOrder: cells[4]?.innerText.trim() || '',
+//                     pdfLink: cells[1]?.querySelector('a')?.href || ''
+//                 };
+//             });
+//         });
+
+//         res.json({ success: true, ...caseMeta, ordersData });
+//     } catch (err) {
+//         console.error('Error fetching case orders:', err);
+//         res.status(500).json({ error: 'Failed to fetch case orders', details: err.message });
+//     } finally {
+//         if (browser) await browser.close();
+//     }
+// });
+
+
 app.get('/api/case-orders', async (req, res) => {
     const { link } = req.query; // Pass the ordersLink as query
 
@@ -507,31 +555,60 @@ app.get('/api/case-orders', async (req, res) => {
         browser = await playwright.chromium.launch({ headless: true });
         const page = await browser.newPage();
 
+        console.log('Opening case orders page:', link);
         await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        // Extract metadata
-        const caseMeta = await page.evaluate(() => ({
-            filingDate: document.querySelector('#lblFilingDate')?.innerText.trim() || '',
-            nextHearingDate: document.querySelector('#lblNextHearingDate')?.innerText.trim() || ''
-        }));
+        // Poll for case metadata (Filing Date & Next Hearing Date)
+        // let caseMeta = { filingDate: '', nextHearingDate: '' };
+        // for (let i = 0; i < 10; i++) {
+        //     caseMeta = await page.evaluate(() => ({
+        //         filingDate: document.querySelector('#lblFilingDate')?.innerText.trim() || '',
+        //         nextHearingDate: document.querySelector('#lblNextHearingDate')?.innerText.trim() || ''
+        //     }));
 
-        // Extract orders data
-        const ordersData = await page.evaluate(() => {
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            return rows.map(row => {
-                const cells = row.querySelectorAll('td');
-                return {
-                    serialNo: cells[0]?.innerText.trim() || '',
-                    caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
-                    dateOfOrder: cells[2]?.innerText.trim() || '',
-                    corrigendum: cells[3]?.innerText.trim() || '',
-                    hindiOrder: cells[4]?.innerText.trim() || '',
-                    pdfLink: cells[1]?.querySelector('a')?.href || ''
-                };
+        //     if (caseMeta.filingDate || caseMeta.nextHearingDate) {
+        //         console.log('Metadata loaded:', caseMeta);
+        //         break;
+        //     }
+
+        //     console.log(`Metadata not loaded yet. Retrying in 2s... (${i + 1}/10)`);
+        //     await new Promise(resolve => setTimeout(resolve, 2000));
+        // }
+
+        // Poll for orders table to ensure data is loaded
+        let ordersData = [];
+        for (let i = 0; i < 10; i++) {
+            const hasOrders = await page.evaluate(() => {
+                const rows = document.querySelectorAll('table tbody tr');
+                if (!rows.length) return false;
+                if (rows.length === 1 && rows[0].querySelector('td.dt-empty')) return false;
+                return true;
             });
-        });
 
-        res.json({ success: true, ...caseMeta, ordersData });
+            if (hasOrders) {
+                console.log('Orders table data found, extracting...');
+                ordersData = await page.evaluate(() => {
+                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                    return rows.map(row => {
+                        const cells = row.querySelectorAll('td');
+                        return {
+                            serialNo: cells[0]?.innerText.trim() || '',
+                            caseNoOrOrderLink: cells[1]?.innerText.trim() || '',
+                            dateOfOrder: cells[2]?.innerText.trim() || '',
+                            corrigendum: cells[3]?.innerText.trim() || '',
+                            hindiOrder: cells[4]?.innerText.trim() || '',
+                            pdfLink: cells[1]?.querySelector('a')?.href || ''
+                        };
+                    });
+                });
+                break;
+            }
+
+            console.log(`Orders not loaded yet. Retrying in 3s... (${i + 1}/10)`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+
+        res.json({ success: true, ordersData });
     } catch (err) {
         console.error('Error fetching case orders:', err);
         res.status(500).json({ error: 'Failed to fetch case orders', details: err.message });
@@ -539,6 +616,7 @@ app.get('/api/case-orders', async (req, res) => {
         if (browser) await browser.close();
     }
 });
+
 
 
 // Optional: Get query history
